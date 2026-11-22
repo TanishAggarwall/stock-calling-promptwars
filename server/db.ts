@@ -1,9 +1,9 @@
-import {database} from './database-client.ts';
+import { database } from './database-client.ts';
 import fs from 'node:fs';
-import {companies,seedEvents} from './catalog.ts';
-const dataDir=process.env.DATA_DIR||'data';
-fs.mkdirSync(dataDir,{recursive:true});
-export const db=database(process.env.TEST_DB||`${dataDir}/postgres`);
+import { companies, seedEvents } from './catalog.ts';
+const dataDir = process.env.DATA_DIR || 'data';
+fs.mkdirSync(dataDir, { recursive: true });
+export const db = database(process.env.TEST_DB || `${dataDir}/postgres`);
 await db.exec(`
  CREATE TABLE IF NOT EXISTS settings (id integer PRIMARY KEY DEFAULT 1 CHECK(id=1), data jsonb NOT NULL);
  CREATE TABLE IF NOT EXISTS companies (id text PRIMARY KEY, data jsonb NOT NULL, monitored boolean DEFAULT true);
@@ -18,10 +18,39 @@ await db.exec(`
  CREATE TABLE IF NOT EXISTS paper_sales (call_id text PRIMARY KEY REFERENCES calls(id),company_id text NOT NULL REFERENCES companies(id),quantity integer NOT NULL,entry_price double precision NOT NULL,sale_price double precision NOT NULL,realized_pnl double precision NOT NULL,created_at timestamptz DEFAULT now());
  ALTER TABLE calls ADD COLUMN IF NOT EXISTS paper_action jsonb;
 `);
-await db.query('INSERT INTO settings(id,data) VALUES(1,$1) ON CONFLICT DO NOTHING',[JSON.stringify({phone:'',callConsent:false,telegramConsent:false,quietStart:'22:00',quietEnd:'08:00',dailyLimit:3,categories:['Environmental','Labour','Governance','Regulatory','Sustainability'],autoMonitor:false,chatId:''})]);
-for(const c of companies)await db.query('INSERT INTO companies(id,data) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET data=$2',[c.id,JSON.stringify(c)]);
-for(const e of seedEvents)await db.query('INSERT INTO events(id,company_id,data) VALUES($1,$2,$3) ON CONFLICT DO NOTHING',[e.id,e.companyId,JSON.stringify(e)]);
-export async function rows<T=any>(q:string,p:any[]=[]):Promise<T[]>{return (await db.query<T>(q,p)).rows;}
-export async function settings(){return (await rows('SELECT data FROM settings WHERE id=1'))[0].data;}
-export async function saveSettings(data:any){await db.query('UPDATE settings SET data=$1 WHERE id=1',[JSON.stringify(data)]);}
-export async function eventById(id:string){return (await rows('SELECT data FROM events WHERE id=$1',[id]))[0]?.data;}
+await db.query('INSERT INTO settings(id,data) VALUES(1,$1) ON CONFLICT DO NOTHING', [
+  JSON.stringify({
+    phone: '',
+    callConsent: false,
+    telegramConsent: false,
+    quietStart: '22:00',
+    quietEnd: '08:00',
+    dailyLimit: 3,
+    categories: ['Environmental', 'Labour', 'Governance', 'Regulatory', 'Sustainability'],
+    autoMonitor: false,
+    chatId: '',
+  }),
+]);
+for (const c of companies)
+  await db.query(
+    'INSERT INTO companies(id,data) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET data=$2',
+    [c.id, JSON.stringify(c)],
+  );
+for (const e of seedEvents)
+  await db.query('INSERT INTO events(id,company_id,data) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [
+    e.id,
+    e.companyId,
+    JSON.stringify(e),
+  ]);
+export async function rows<T = any>(q: string, p: any[] = []): Promise<T[]> {
+  return (await db.query<T>(q, p)).rows;
+}
+export async function settings() {
+  return (await rows('SELECT data FROM settings WHERE id=1'))[0].data;
+}
+export async function saveSettings(data: any) {
+  await db.query('UPDATE settings SET data=$1 WHERE id=1', [JSON.stringify(data)]);
+}
+export async function eventById(id: string) {
+  return (await rows('SELECT data FROM events WHERE id=$1', [id]))[0]?.data;
+}
