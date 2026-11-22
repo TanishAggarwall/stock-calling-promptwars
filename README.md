@@ -343,3 +343,34 @@ The design is Groww-inspired, with original application flows. Company logos, th
 <img src="https://capsule-render.vercel.app/api?type=waving&color=0:061B14,50:00B58B,100:083D2B&height=120&section=footer" width="100%" alt="Team BB footer"/>
 
 </div>
+
+
+---
+
+## 🏆 PromptWars submission notes
+
+### Chosen vertical
+**Finance and Student Life.** Students and first-time investors often buy a few shares and then miss the moment a holding crashes or spikes, because nobody watches a dashboard all day. Stock Calling is a smart, dynamic assistant that watches a paper portfolio for them and speaks up only when it matters.
+
+### Approach and logic
+The assistant makes decisions from the user's own context, not from fixed rules:
+
+| User context | Decision the assistant makes |
+|---|---|
+| Holdings, average price and per-stock crash / gain thresholds | Whether a price move is big enough to alert on |
+| Call and Telegram consent, quiet hours and a daily call limit | Whether to phone the user now, send Telegram only, or stay silent |
+| Company-impact events (governance, labour, regulatory, sustainability) | What context to explain on the call |
+| The live call transcript plus a demo PIN | Whether a spoken "sell" request is authorised to close the paper position |
+
+### How the solution works
+1. The React dashboard shows quotes, holdings, market movers and the paper portfolio.
+2. The Express API stores data in PostgreSQL (PGlite locally) and checks each holding against its thresholds.
+3. When a threshold is crossed and policy allows it, an OmniDimension AI voice agent calls the user and answers questions in English, Hindi or Hinglish.
+4. The call summary is saved to the dashboard and a follow-up is sent through the Telegram bot.
+5. A paper sale only executes after the backend validates the transcript and the PIN.
+
+### Security, testing and deployment
+Helmet headers, rate limiting, zod input validation, a 32 kB JSON body limit, timing-safe dashboard login, and no secrets in the repository (`.env.example` only). Automated tests cover the workflow, paper sales, portfolio maths and Telegram delivery (`npm test`), and CI runs on every push. The app is containerised with the included `Dockerfile` and deployed to Google Cloud Run.
+
+### Assumptions
+Market quotes come from a real provider, but purchases, sales and crash / gain scenarios are paper (simulated) trades; no real money moves. Voice calls and Telegram messages need the user's own API keys and consent; without them the dashboard still runs in demo mode.
