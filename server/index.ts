@@ -14,11 +14,13 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 const app=express(),port=Number(process.env.PORT||3000);
 const cloud=process.env.CLOUD_MODE==='true';
-if(cloud&&(!process.env.DASHBOARD_PASSWORD||process.env.DASHBOARD_PASSWORD.length<20))throw new Error('Cloud deployment requires DASHBOARD_PASSWORD of at least 20 characters.');
+// PUBLIC_DEMO opens the dashboard without login but keeps every side-effecting integration locked.
+const demo=cloud&&process.env.PUBLIC_DEMO==='true';
+if(cloud&&!demo&&(!process.env.DASHBOARD_PASSWORD||process.env.DASHBOARD_PASSWORD.length<20))throw new Error('Cloud deployment requires DASHBOARD_PASSWORD of at least 20 characters.');
 if(cloud)app.set('trust proxy',1);
 app.use(helmet({contentSecurityPolicy:false}));
 app.get('/health',(_req,res)=>res.json({status:'ok'}));
-if(cloud)app.use((req,res,next)=>{
+if(cloud&&!demo)app.use((req,res,next)=>{
  const raw=String(req.headers.authorization||'');
  const expected='team-bb:'+process.env.DASHBOARD_PASSWORD;
  const supplied=raw.startsWith('Basic ')?Buffer.from(raw.slice(6),'base64').toString():'';
@@ -38,6 +40,7 @@ app.use('/api',(req,res,next)=>{
  res.setHeader('Cache-Control','no-store');next();
 });
 app.use('/api',rateLimit({windowMs:60000,limit:100,standardHeaders:true,legacyHeaders:false}));
+if(demo)app.use(['/api/secrets','/api/calls','/api/omni','/api/telegram'],(req,res,next)=>['GET','HEAD'].includes(req.method)?next():res.status(403).json({error:'Disabled in the public demo. Run locally with your own keys to place calls.'}));
 app.get('/api/state',async(_req,res)=>{
  const s=await settings();const cs=await rows('SELECT data,monitored FROM companies ORDER BY id');
  res.json({settings:s,companies:cs.map(c=>({...c.data,monitored:c.monitored})),events:(await rows('SELECT data FROM events ORDER BY data->>\'published\' DESC')).map(e=>e.data),calls:await rows('SELECT * FROM calls ORDER BY created_at DESC'),messages:await rows('SELECT id,call_id,event_id,status,attempts,error,provider_message_id,created_at FROM messages ORDER BY created_at DESC'),runs:await rows('SELECT * FROM runs ORDER BY created_at DESC LIMIT 5'),integrations:{omniKey:!!process.env.OMNIDIM_API_KEY,agentId:process.env.OMNIDIM_AGENT_ID||null,telegramToken:!!process.env.TELEGRAM_BOT_TOKEN}});
